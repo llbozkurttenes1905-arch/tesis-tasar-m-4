@@ -2136,6 +2136,7 @@ function animate() {
 window.addEventListener('resize', onWindowResize, false);
 
 function onWindowResize() {
+    if (!camera || !renderer) return; // init() henüz çalışmadıysa hiçbir şey yapma
     const container = document.getElementById('canvas-container');
     camera.aspect = container.clientWidth / container.clientHeight;
     camera.updateProjectionMatrix();
