@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tesis Planlama Optimizasyonu (3D Facility Layout Optimizer)</title>
+    <!-- Live Javascript Error Debugging -->
+    <script>
+        window.addEventListener('error', function(e) {
+            const errBox = document.createElement('div');
+            errBox.id = 'js-debug-error';
+            errBox.style.position = 'fixed';
+            errBox.style.bottom = '20px';
+            errBox.style.right = '20px';
+            errBox.style.background = 'rgba(239, 68, 68, 0.95)';
+            errBox.style.color = '#ffffff';
+            errBox.style.padding = '16px';
+            errBox.style.borderRadius = '8px';
+            errBox.style.zIndex = '99999';
+            errBox.style.fontSize = '13px';
+            errBox.style.fontFamily = 'monospace';
+            errBox.style.boxShadow = '0 10px 25px rgba(0,0,0,0.5)';
+            errBox.style.border = '1px solid #f87171';
+            errBox.style.maxWidth = '400px';
+            errBox.innerText = 'JS Hata: ' + e.message + '\nDosya: ' + e.filename.split('/').pop() + '\nSatır: ' + e.lineno;
+            document.body.appendChild(errBox);
+        });
+    </script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Space+Grotesk:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Dashboard -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <i class="fa-solid fa-industry logo-icon"></i>
+                <div>
+                    <h1>Planlama Optimizasyonu</h1>
+                    <p class="subtitle">Kapı Üretim Tesisi Planı</p>
+                </div>
+            </div>
+
+            <!-- Layout Controls -->
+            <section class="control-section">
+                <h2><i class="fa-solid fa-map-location-dot"></i> YERLEŞİM DÜZENİ</h2>
+                <div class="layout-selector">
+                    <button class="btn active" id="btn-layout-a" onclick="window.setLayout('current')">
+                        <span class="btn-title">Alternatif 1 (Mevcut)</span>
+                        <span class="btn-desc">Backtracking ve yüksek lojistik kayıp</span>
+                    </button>
+                    <button class="btn" id="btn-layout-b" onclick="window.setLayout('optimized')">
+                        <span class="btn-title">Layout B (U-Tipi Önerilen)</span>
+                        <span class="btn-desc">U-Hücresel akış ve %41 daha kısa mesafe</span>
+                    </button>
+                    <button class="btn" id="btn-layout-custom" onclick="window.setLayout('custom')">
+                        <span class="btn-title">Serbest Tasarım</span>
+                        <span class="btn-desc">Makineleri 3D alanda taşıyıp test edin</span>
+                    </button>
+                </div>
+            </section>
+
+            <!-- Metrics Panel -->
+            <section class="metrics-section">
+                <h2><i class="fa-solid fa-chart-line"></i> VERİMLİLİK ANALİZİ</h2>
+                
+                <div class="metric-card">
+                    <div class="metric-info">
+                        <span>Toplam Malzeme Akış Mesafesi</span>
+                        <strong id="val-distance">280 m</strong>
+                    </div>
+                    <div class="progress-bar-container">
+                        <div class="progress-bar warning" id="bar-distance" style="width: 85%;"></div>
+                    </div>
+                </div>
+
+                <div class="metric-card">
+                    <div class="metric-info">
+                        <span>Geri Akış (Backtracking) Oranı</span>
+                        <strong id="val-backtracking">Yüksek (%45)</strong>
+                    </div>
+                    <div class="progress-bar-container">
+                        <div class="progress-bar danger" id="bar-backtracking" style="width: 90%;"></div>
+                    </div>
+                </div>
+
+                <div class="metric-card">
+                    <div class="metric-info">
+                        <span>Toz Emme Yükü & Verim</span>
+                        <strong id="val-dust">Orta (%55)</strong>
+                    </div>
+                    <div class="progress-bar-container">
+                        <div class="progress-bar info" id="bar-dust" style="width: 55%;"></div>
+                    </div>
+                </div>
+
+                <div class="metric-card main-score">
+                    <div class="metric-info">
+                        <span>Genel Düzen Skor</span>
+                        <strong id="val-score">D (%52)</strong>
+                    </div>
+                    <div class="progress-bar-container">
+                        <div class="progress-bar rating-d" id="bar-score" style="width: 52%;"></div>
+                    </div>
+                    <div class="score-delta" id="score-delta"></div>
+                </div>
+            </section>
+
+            <!-- Visual Legend -->
+            <section class="legend-section">
+                <h2><i class="fa-solid fa-tags"></i> AÇIKLAMALAR</h2>
+                <div class="legend-grid">
+                    <div class="legend-item"><span class="legend-dot color-fixed"></span> Ana Üretim Hattı (Torwegge/Homag/ETA)</div>
+                    <div class="legend-item"><span class="legend-dot color-office"></span> Ofis ve İdari Odalar</div>
+                    <div class="legend-item"><span class="legend-dot color-stock"></span> Depo / Stok Alanları</div>
+                    <div class="legend-item"><span class="legend-dot color-cnc"></span> CNC & Kesim (Değişebilir)</div>
+                    <div class="legend-item"><span class="legend-dot color-utility"></span> Toz Emme & Kompresör</div>
+                    <div class="legend-item"><span class="legend-dot color-gate"></span> Giriş / Çıkış Kapıları</div>
+                </div>
+            </section>
+
+            <!-- Cost Analysis Panel -->
+            <section class="cost-section">
+                <h2><i class="fa-solid fa-turkish-lira-sign"></i> MALİYET ANALİZİ</h2>
+                <div class="cost-inputs">
+                    <label>
+                        <span>Taşıma Maliyeti (₺ / metre / sefer)</span>
+                        <input type="number" id="cost-per-meter" value="2.5" min="0" step="0.1" oninput="window.updateCostAnalysis()">
+                    </label>
+                    <label>
+                        <span>Günlük Sefer Sayısı</span>
+                        <input type="number" id="trips-per-day" value="40" min="0" step="1" oninput="window.updateCostAnalysis()">
+                    </label>
+                    <label>
+                        <span>Çalışma Günü / Yıl</span>
+                        <input type="number" id="days-per-year" value="250" min="0" step="1" oninput="window.updateCostAnalysis()">
+                    </label>
+                </div>
+                <div class="cost-results">
+                    <div class="cost-row">
+                        <span>Günlük Lojistik Maliyeti</span>
+                        <strong id="cost-daily">₺0</strong>
+                    </div>
+                    <div class="cost-row highlight">
+                        <span>Yıllık Tahmini Maliyet</span>
+                        <strong id="cost-yearly">₺0</strong>
+                    </div>
+                    <div class="cost-row" id="cost-savings-row" style="display:none;">
+                        <span>Mevcut Duruma (Alternatif 1) Göre Fark</span>
+                        <strong id="cost-savings">₺0</strong>
+                    </div>
+                </div>
+                <p class="cost-note"><i class="fa-solid fa-circle-info"></i> Bu hesap, toplam malzeme akış mesafesine ve girdiğiniz varsayımlara dayanan bir tahmindir; gerçek maliyetleriniz için kendi ₺/metre ve sefer verilerinizi girin.</p>
+            </section>
+
+            <!-- 3D Yerleşim Editörü: add your own custom elements -->
+            <section class="editor-section">
+                <h2><i class="fa-solid fa-pen-ruler"></i> 3D YERLEŞİM EDİTÖRÜ</h2>
+                <p class="type-picker-label">Eleman türü seçin (görsel):</p>
+                <div class="type-picker-grid" id="type-picker-grid">
+                    <button class="type-card active" onclick="window.selectNewElemType('cnc', this)"><span class="type-card-icon">⚙️</span>Makine</button>
+                    <button class="type-card" onclick="window.selectNewElemType('stock', this)"><span class="type-card-icon">📦</span>Stok Alanı</button>
+                    <button class="type-card" onclick="window.selectNewElemType('office', this)"><span class="type-card-icon">🏢</span>Ofis / Oda</button>
+                    <button class="type-card" onclick="window.selectNewElemType('utility', this)"><span class="type-card-icon">🔧</span>Teknik Ünite</button>
+                    <button class="type-card" onclick="window.selectNewElemType('forklift_zone', this)"><span class="type-card-icon">🚚</span>Forklift Park</button>
+                    <button class="type-card" onclick="window.selectNewElemType('column', this)"><span class="type-card-icon">🏛️</span>Kolon</button>
+                </div>
+                <div class="editor-row">
+                    <input type="text" id="new-elem-name" placeholder="Eleman ismi girin...">
+                    <input type="color" id="new-elem-color" value="#38BDF8">
+                </div>
+                <div class="editor-row">
+                    <button class="btn-add-elem" onclick="window.addCustomElement()"><i class="fa-solid fa-plus"></i> Yeni Eleman Ekle</button>
+                </div>
+                <p class="structure-hint"><i class="fa-solid fa-circle-info"></i> Bir eleman eklendikten sonra sahnedeki herhangi bir elemana tıklayıp sağdaki <strong>Eleman Detayları</strong> panelinden ölçeğini büyütüp küçültebilirsiniz.</p>
+                <div class="custom-elements-list" id="custom-elements-list"></div>
+            </section>
+
+            <!-- Yapısal Elemanlar: removable walls + structural columns -->
+            <section class="structure-section">
+                <h2><i class="fa-solid fa-building-columns"></i> YAPISAL ELEMANLAR</h2>
+                <div class="wall-toggle-row">
+                    <span>Arka Duvar</span>
+                    <label class="switch"><input type="checkbox" id="wall-back" checked onchange="window.toggleWall('factoryWallBack')"><span class="slider-pill"></span></label>
+                </div>
+                <div class="wall-toggle-row">
+                    <span>Sol Duvar</span>
+                    <label class="switch"><input type="checkbox" id="wall-left" checked onchange="window.toggleWall('factoryWallLeft')"><span class="slider-pill"></span></label>
+                </div>
+                <div class="wall-toggle-row">
+                    <span>Sağ Duvar</span>
+                    <label class="switch"><input type="checkbox" id="wall-right" checked onchange="window.toggleWall('factoryWallRight')"><span class="slider-pill"></span></label>
+                </div>
+                <div class="wall-toggle-row">
+                    <span><i class="fa-solid fa-border-none"></i> Pencereler</span>
+                    <label class="switch"><input type="checkbox" id="wall-windows" checked onchange="window.toggleWindows()"><span class="slider-pill"></span></label>
+                </div>
+                <p class="structure-hint"><i class="fa-solid fa-circle-info"></i> Duvarları kapatıp bina hattını değiştirebilir, aşağıdaki kaydırıcıyla duvar yüksekliğini ayarlayabilirsiniz. Kolon eklemek için yukarıda eleman türü olarak <strong>"Yapısal Kolon"</strong>u seçip "Yeni Eleman Ekle"ye basın. Giriş/çıkış kapıları da artık diğer elemanlar gibi sürüklenebilir.</p>
+                <div class="wall-height-row">
+                    <span>Duvar Yüksekliği (m)</span>
+                    <input type="range" id="wall-height-m" min="6" max="40" step="1" value="15" oninput="window.updateWallHeight()">
+                    <strong id="wall-height-val">15 m</strong>
+                </div>
+            </section>
+
+            <!-- Bağlantı Kurma Modu: draw material-flow or forklift routes between any two elements -->
+            <section class="connection-section">
+                <h2><i class="fa-solid fa-link"></i> BAĞLANTI KURMA MODU</h2>
+                <button class="btn-connection-toggle" id="btn-connection-mode" onclick="window.toggleConnectionMode()">
+                    <i class="fa-solid fa-link"></i> Bağlantı Kurma Modu: <span id="connection-mode-status">KAPALI</span>
+                </button>
+                <select id="connection-kind" class="connection-kind-select">
+                    <option value="material">Malzeme Akışı Bağlantısı</option>
+                    <option value="forklift">Forklift Rotası</option>
+                </select>
+                <button class="btn-connection-reset" onclick="window.resetCustomConnections()"><i class="fa-solid fa-rotate-left"></i> Özel Bağlantıları Sıfırla</button>
+                <p class="connection-hint" id="connection-hint">Bağlantı modunu açın, sırayla 3D sahnede kaynak ve hedef makinelere tıklayın.</p>
+                <p class="connection-hint tip"><i class="fa-solid fa-lightbulb"></i> İpucu: 3D sahnedeki herhangi bir makineyi farenizle sürükleyip taşıyabilirsiniz!</p>
+                <div class="connection-suggestion" id="connection-suggestion" style="display:none;"></div>
+            </section>
+
+            <!-- Alan & Metrekare Hesaplayıcı -->
+            <section class="area-section">
+                <h2><i class="fa-solid fa-ruler-combined"></i> ALAN & METREKARE HESAPLAYICI</h2>
+                <div class="area-inputs">
+                    <label>
+                        <span>Fabrika Genişliği (m):</span>
+                        <input type="number" id="factory-width-m" value="230" min="20" step="1" oninput="window.updateFactoryArea()">
+                    </label>
+                    <label>
+                        <span>Fabrika Derinliği (m):</span>
+                        <input type="number" id="factory-depth-m" value="120" min="20" step="1" oninput="window.updateFactoryArea()">
+                    </label>
+                </div>
+                <div class="area-stat">
+                    <span>TOPLAM FABRİKA ALANI</span>
+                    <strong id="area-total">0 m²</strong>
+                </div>
+                <div class="area-grid">
+                    <div class="area-stat small">
+                        <span>TOPLAM KAPLANAN ALAN</span>
+                        <strong id="area-occupied">0 m²</strong>
+                    </div>
+                    <div class="area-stat small">
+                        <span>BOŞ / SERBEST ALAN</span>
+                        <strong id="area-free">0 m²</strong>
+                    </div>
+                </div>
+                <div class="area-stat">
+                    <span>ALAN KULLANIM (DOLULUK) ORANI</span>
+                    <strong id="area-usage-pct">0%</strong>
+                    <div class="progress-bar-container">
+                        <div class="progress-bar info" id="area-usage-bar" style="width:0%;"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Simülasyon Ayarları -->
+            <section class="sim-section">
+                <h2><i class="fa-solid fa-sliders"></i> SİMÜLASYON AYARLARI</h2>
+                <div class="sim-toggle-row">
+                    <span>Malzeme Akışı</span>
+                    <label class="switch"><input type="checkbox" id="sim-toggle-flow" checked onchange="window.toggleFlowLines()"><span class="slider-pill"></span></label>
+                </div>
+                <div class="sim-toggle-row">
+                    <span>Spagetti Diyagramı</span>
+                    <label class="switch"><input type="checkbox" id="sim-toggle-spaghetti" onchange="window.toggleSpaghettiDiagram()"><span class="slider-pill"></span></label>
+                </div>
+                <div class="sim-toggle-row">
+                    <span>İş Güvenliği Sınırları</span>
+                    <label class="switch"><input type="checkbox" id="sim-toggle-safety" onchange="window.toggleSafetyZones()"><span class="slider-pill"></span></label>
+                </div>
+                <div class="sim-slider-row">
+                    <span>Akış Hızı</span>
+                    <input type="range" id="sim-flow-speed" min="0.2" max="3" step="0.1" value="1" oninput="window.updateFlowSpeed()">
+                </div>
+            </section>
+
+            <!-- Eleman Detayları -->
+            <section class="details-section">
+                <h2><i class="fa-solid fa-circle-info"></i> ELEMAN DETAYLARI</h2>
+                <div class="details-box" id="element-details">
+                    Detaylarını görmek için 3D sahnedeki herhangi bir makine, stok alanı veya odaya tıklayın.
+                </div>
+            </section>
+
+            <!-- Instructions -->
+            <div class="instructions" id="custom-instructions" style="display: none;">
+                <i class="fa-solid fa-circle-info"></i>
+                <p><strong>Serbest Tasarım Aktif:</strong> Yeşil sınırlı, hareketli makineleri (CNC, Yatar Kesim, Stok alanları, Torwegge/Homag/ETA ana hattı, Toz Emme, Merdiven, Kompresör, Giriş/Çıkış Kapıları vb.) mouse ile tıklayıp sürükleyerek istediğiniz yere taşıyabilirsiniz — sadece idari ofis sabit kalır. Taşırken malzeme akış çizgileri, mesafe ve verimlilik skoru anında yeniden hesaplanır; skor kutusunun altında o taşımanın skoru ne kadar değiştirdiğini görebilirsiniz. Üstteki <strong>Ölçüm Aracı</strong> ile iki noktaya tıklayıp gerçek metre cinsinden mesafe ölçebilir, soldaki <strong>Maliyet Analizi</strong> panelinde kendi ₺/metre ve sefer verilerinizi girip lojistik maliyetini canlı görebilirsiniz.</p>
+            </div>
+
+            <!-- Kaydet & Dışa Aktar: free-form design save/load in JSON, plus PNG snapshot -->
+            <section class="save-section">
+                <h2><i class="fa-solid fa-floppy-disk"></i> KAYDET & DIŞA AKTAR</h2>
+                <button class="btn-save-design" onclick="window.saveDesignJSON()">
+                    <i class="fa-solid fa-file-code"></i> Tasarımı Kaydet (JSON)
+                </button>
+                <label class="btn-save-design btn-load-design" for="load-design-input">
+                    <i class="fa-solid fa-folder-open"></i> Tasarımı Yükle (JSON)
+                </label>
+                <input type="file" id="load-design-input" accept="application/json" style="display:none" onchange="window.loadDesignJSON(event)">
+                <button class="btn-save-design" onclick="window.exportImage()">
+                    <i class="fa-solid fa-image"></i> Görsel Olarak Kaydet (PNG)
+                </button>
+                <p class="cost-note"><i class="fa-solid fa-circle-info"></i> JSON kaydı; eleman konumları, ölçekleri, renkleri, bağlantıları, duvar/pencere ayarları ve fabrika ölçülerini içerir — daha sonra "Yükle" ile aynen geri getirebilirsiniz.</p>
+            </section>
+
+            <!-- Report Export -->
+            <button class="btn-export-pdf" id="btn-export-pdf" onclick="window.exportPdfReport()">
+                <i class="fa-solid fa-file-pdf"></i> PDF Rapor İndir
+            </button>
+        </aside>
+
+        <!-- Viewport Area -->
+        <main class="viewport-area">
+            <!-- Overlay controls -->
+            <div class="viewport-controls">
+                <div class="left-controls">
+                    <button class="control-btn active" id="toggle-flow" onclick="window.toggleFlowLines()"><i class="fa-solid fa-route"></i> Akış Çizgileri</button>
+                    <button class="control-btn" id="toggle-grid" onclick="window.toggleGrid()"><i class="fa-solid fa-grid-2"></i> Izgara</button>
+                    <button class="control-btn" id="toggle-ruler" onclick="window.toggleRuler()"><i class="fa-solid fa-ruler"></i> Ölçüm Aracı</button>
+                    <button class="control-btn" id="clear-ruler" onclick="window.clearMeasurements()" style="display:none;"><i class="fa-solid fa-eraser"></i> Ölçümleri Temizle</button>
+                    <button class="control-btn" onclick="window.resetCamera()"><i class="fa-solid fa-camera-rotate"></i> Kamerayı Sıfırla</button>
+                </div>
+                <div class="view-mode">
+                    <button class="mode-btn active" id="btn-3d" onclick="window.setViewMode('3d')">3D Görünüm</button>
+                    <button class="mode-btn" id="btn-2d" onclick="window.setViewMode('2d')">Üstten (2D)</button>
+                </div>
+            </div>
+
+            <!-- Loader -->
+            <div class="loader-overlay" id="loader">
+                <div class="loader-spinner"></div>
+                <p>3D Fabrika Modeli Yükleniyor...</p>
+            </div>
+
+            <!-- 3D Canvas -->
+            <div id="canvas-container"></div>
+            <div id="ruler-labels"></div>
+        </main>
+    </div>
+
+    <!-- Three.js and OrbitControls via Global CDN (More reliable and CORS-safe) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <!-- jsPDF for the in-browser PDF report export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <!-- Main Logic Script -->
+    <script src="app.js"></script>
+</body>
+</html>
